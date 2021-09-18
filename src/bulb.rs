@@ -4,6 +4,7 @@ use crate::power::Power;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
+#[derive(Debug)]
 pub struct Bulb {
     // The ID of a Yeelight WiFi LED device that uniquely identifies a Yeelight WiFi LED device.
     pub id: String,
