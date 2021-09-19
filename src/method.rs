@@ -34,4 +34,22 @@ impl Method {
             _ => None,
         }
     }
+
+    pub fn to_str(&self) -> &'static str {
+        match self {
+            Method::GetProp => "get_prop",
+            Method::SetDefault => "set_default",
+            Method::SetPower => "set_power",
+            Method::Toggle => "toggle",
+            Method::SetBright => "set_bright",
+            Method::StartCf => "start_cf",
+            Method::StopCf => "stop_cf",
+            Method::SetScene => "set_scene",
+            Method::CronAdd => "cron_add",
+            Method::CronGet => "cron_get",
+            Method::CronDel => "cron_del",
+            Method::SetCtAbx => "set_ct_abx",
+            Method::SetRgb => "set_rgb",
+        }
+    }
 }

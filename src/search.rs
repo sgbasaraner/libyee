@@ -11,7 +11,7 @@ pub enum BulbSearcher {
 }
 
 impl BulbSearcher {
-    pub async fn search(&self) -> Option<Vec<Bulb>> {
+    pub fn search(&self) -> Option<Vec<Bulb>> {
         let socket = UdpSocket::bind("0.0.0.0:34254");
         if socket.is_err() {
             return None;
@@ -63,12 +63,20 @@ impl BulbSearcher {
 
 #[cfg(test)]
 mod tests {
+    use crate::connection::BulbConnection;
+
     use super::BulbSearcher;
 
-    #[tokio::test]
-    async fn bulb_search_test() {
-        let bulb = BulbSearcher::UntilBulbCount(1).search().await;
+    #[test]
+    fn bulb_search_test() {
+        let mut bulbs = BulbSearcher::UntilBulbCount(1).search().unwrap();
 
-        println!("{:?}", bulb);
+        let bulb = bulbs.remove(0);
+
+        let mut conn = BulbConnection::new(bulb).unwrap();
+
+        let res = conn.get_prop(&["power", "not_exist", "bright"]).unwrap();
+
+        println!("{:?}", res)
     }
 }
