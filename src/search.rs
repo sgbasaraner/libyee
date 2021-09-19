@@ -5,12 +5,12 @@ use std::{str, time};
 
 const MULTICAST_ADDR: &str = "239.255.255.250:1982";
 
-enum SearchMode {
+pub enum SearchMode {
     Duration(Duration),
     BulbCount(usize),
 }
 
-async fn find_bulbs(mode: SearchMode) -> Option<Vec<Bulb>> {
+pub async fn find_bulbs(mode: SearchMode) -> Option<Vec<Bulb>> {
     let socket = UdpSocket::bind("0.0.0.0:34254");
     if socket.is_err() {
         return None;
