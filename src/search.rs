@@ -11,7 +11,11 @@ enum SearchMode {
 }
 
 async fn find_bulbs(mode: SearchMode) -> Option<Vec<Bulb>> {
-    let socket = UdpSocket::bind("0.0.0.0:34254").unwrap();
+    let socket = UdpSocket::bind("0.0.0.0:34254");
+    if socket.is_err() {
+        return None;
+    }
+    let socket = socket.unwrap();
     let message = b"M-SEARCH * HTTP/1.1\r\n
                     HOST: 239.255.255.250:1982\r\n
                     MAN: \"ssdp:discover\"\r\n
