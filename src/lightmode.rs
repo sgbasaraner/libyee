@@ -15,7 +15,7 @@ pub struct HSV {
 pub enum LightMode {
     Color(RGB),
     // Current color temperature value.
-    ColorTemperature(u32),
+    ColorTemperature(u16),
     Hsv(HSV),
 }
 
@@ -40,7 +40,7 @@ impl LightMode {
                     .map(|rgb| LightMode::Color(rgb)),
                 2 => response_map
                     .get("ct")
-                    .map(|ct| ct.parse::<u32>().ok())
+                    .map(|ct| ct.parse::<u16>().ok())
                     .flatten()
                     .map(|ct| LightMode::ColorTemperature(ct)),
                 3 => response_map
