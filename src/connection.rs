@@ -1,5 +1,6 @@
 use std::{
     convert::TryInto,
+    fmt::Debug,
     io::{Error, Read, Write},
     net::TcpStream,
     sync::Mutex,
@@ -46,18 +47,35 @@ pub enum MethodCallError {
     IOError(std::io::Error),
     ParseError,
     SynchronizationError,
+    ErrorResponse(ErrorResponse),
+}
+
+pub trait MethodCallResponse<'a>: Deserialize<'a> + Debug {
+    fn id(&self) -> i16;
 }
 
 #[derive(Debug, Deserialize)]
-pub struct MethodCallResponse {
+pub struct ErrorResponse {
     id: i16,
-    result: Vec<Value>,
+    error: BulbErrorResponse,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
+pub struct BulbErrorResponse {
+    code: i32,
+    message: String,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct StringVecResponse {
     id: i16,
     result: Vec<String>,
+}
+
+impl<'a> MethodCallResponse<'a> for StringVecResponse {
+    fn id(&self) -> i16 {
+        self.id
+    }
 }
 
 impl BulbConnection {
@@ -68,51 +86,47 @@ impl BulbConnection {
         });
     }
 
-    fn call_method(
-        &mut self,
-        method: Method,
-        args: Vec<MethodArg>,
-    ) -> Result<MethodCallResponse, MethodCallError> {
+    fn call_method<T>(&mut self, method: Method, args: Vec<MethodArg>) -> Result<T, MethodCallError>
+    where
+        for<'a> T: MethodCallResponse<'a>,
+    {
         if !self.bulb.support.contains(&method) {
             return Err(MethodCallError::UnsupportedMethod);
         }
 
-        match self.connection.lock() {
-            Ok(mut conn) => {
-                let mut rng = rand::thread_rng();
-                let id: i16 = rng.gen();
-                let message = create_message(id, &method, args);
+        let mut conn = self
+            .connection
+            .lock()
+            .map_err(|_| MethodCallError::SynchronizationError)?;
 
-                let write_result = conn.write(message.as_bytes());
-                if write_result.is_err() {
-                    return Err(MethodCallError::IOError(write_result.unwrap_err()));
-                }
+        let mut rng = rand::thread_rng();
+        let id: i16 = rng.gen();
+        let message = create_message(id, &method, args);
 
-                let mut buf = [0; 2048];
-                match conn.read(&mut buf) {
-                    Ok(_) => {
-                        let rs = std::str::from_utf8(&buf)
-                            .ok()
-                            .map(|s| s.trim_end_matches(char::from(0)).trim_end())
-                            .map(|s| serde_json::from_str::<MethodCallResponse>(s).ok())
-                            .flatten()
-                            .ok_or(MethodCallError::ParseError);
+        conn.write(message.as_bytes())
+            .map_err(|err| MethodCallError::IOError(err))?;
 
-                        match rs {
-                            Ok(rs) => {
-                                if rs.id == id {
-                                    Ok(rs)
-                                } else {
-                                    Err(MethodCallError::SynchronizationError)
-                                }
-                            }
-                            Err(err) => Err(err),
-                        }
+        let mut buf = [0; 2048];
+        conn.read(&mut buf)
+            .map_err(|err| MethodCallError::IOError(err))?;
+
+        let rs = std::str::from_utf8(&buf)
+            .map_err(|_| MethodCallError::ParseError)
+            .map(|s| s.trim_end_matches(char::from(0)).trim_end())
+            .map(|s| {
+                serde_json::from_str::<T>(s).map_err(|_| {
+                    let error = serde_json::from_str::<ErrorResponse>(s);
+                    match error {
+                        Ok(ers) => MethodCallError::ErrorResponse(ers),
+                        Err(_) => MethodCallError::ParseError,
                     }
-                    Err(err) => Err(MethodCallError::IOError(err)),
-                }
-            }
-            Err(_) => Err(MethodCallError::SynchronizationError),
+                })
+            })??;
+
+        if rs.id() == id {
+            Ok(rs)
+        } else {
+            Err(MethodCallError::SynchronizationError)
         }
     }
 
@@ -127,10 +141,7 @@ impl BulbConnection {
 
         let args = props.iter().map(|p| MethodArg::String(*p)).collect();
 
-        match self.call_method(Method::GetProp, args) {
-            Ok(rs) => parse_string_vec(rs),
-            Err(e) => Err(e),
-        }
+        self.call_method(Method::SetCtAbx, args)
     }
 
     /// This method is used to change the color temperature of a smart LED.
@@ -170,22 +181,7 @@ impl BulbConnection {
             }
         };
 
-        match self.call_method(Method::SetCtAbx, params) {
-            Ok(rs) => parse_string_vec(rs),
-            Err(e) => Err(e),
-        }
-    }
-}
-
-fn parse_string_vec(rs: MethodCallResponse) -> Result<StringVecResponse, MethodCallError> {
-    let strs: Vec<Option<&str>> = rs.result.iter().map(|v| v.as_str()).collect();
-    if strs.iter().any(|s| s.is_none()) {
-        Err(MethodCallError::ParseError)
-    } else {
-        Ok(StringVecResponse {
-            id: rs.id,
-            result: strs.iter().map(|s| s.unwrap().to_string()).collect(),
-        })
+        self.call_method(Method::SetCtAbx, params)
     }
 }
 
