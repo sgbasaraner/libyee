@@ -9,6 +9,7 @@ use std::{
 
 use crate::{
     bulb::{self, Bulb},
+    lightmode::HSV,
     method::Method,
     rgb::RGB,
 };
@@ -159,13 +160,52 @@ impl BulbConnection {
 
         let args = mode.to_method_args()?;
 
-        self.call_method(Method::SetCtAbx, vec![MethodArg::Int(ct_value.into())].into_iter().chain(args.into_iter()).collect())
+        self.call_method(
+            Method::SetCtAbx,
+            vec![MethodArg::Int(ct_value.into())]
+                .into_iter()
+                .chain(args.into_iter())
+                .collect(),
+        )
     }
 
-    pub fn set_rgb(&mut self, rgb: &RGB, mode: TransitionMode) -> Result<StringVecResponse, MethodCallError> {
+    pub fn set_rgb(
+        &mut self,
+        rgb: &RGB,
+        mode: TransitionMode,
+    ) -> Result<StringVecResponse, MethodCallError> {
         let args = mode.to_method_args()?;
 
-        self.call_method(Method::SetCtAbx, vec![MethodArg::Int(u32::from(rgb) as i32)].into_iter().chain(args.into_iter()).collect())
+        self.call_method(
+            Method::SetRgb,
+            vec![MethodArg::Int(u32::from(rgb) as i32)]
+                .into_iter()
+                .chain(args.into_iter())
+                .collect(),
+        )
+    }
+
+    pub fn set_hsv(
+        &mut self,
+        hsv: &HSV,
+        mode: TransitionMode,
+    ) -> Result<StringVecResponse, MethodCallError> {
+        if !hsv.validate() {
+            return Err(MethodCallError::BadRequest);
+        }
+
+        let args = mode.to_method_args()?;
+
+        self.call_method(
+            Method::SetHsv,
+            vec![
+                MethodArg::Int(hsv.hue as i32),
+                MethodArg::Int(hsv.saturation as i32),
+            ]
+            .into_iter()
+            .chain(args.into_iter())
+            .collect(),
+        )
     }
 }
 
@@ -207,7 +247,7 @@ fn create_message(id: i16, method: &Method, args: Vec<MethodArg>) -> String {
         "{\"id\":",
         &id.to_string()[..],
         ",\"method\":\"",
-        method.to_str(),
+        method.into(),
         "\",\"params\":[",
         &arg_strs.join(", "),
         "]}\r\n",

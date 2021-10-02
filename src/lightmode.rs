@@ -11,6 +11,15 @@ pub struct HSV {
     pub saturation: u8,
 }
 
+const MAX_HUE: u16 = 359;
+const MAX_SAT: u8 = 100;
+
+impl HSV {
+    pub fn validate(&self) -> bool {
+        return self.hue <= MAX_HUE && self.saturation <= MAX_SAT;
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum LightMode {
     Color(RGB),

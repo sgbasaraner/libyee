@@ -1,3 +1,5 @@
+use std::convert::TryFrom;
+
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub enum Method {
     GetProp,
@@ -13,30 +15,36 @@ pub enum Method {
     CronDel,
     SetCtAbx,
     SetRgb,
+    SetHsv,
 }
 
-impl Method {
-    pub fn parse(str: &str) -> Option<Method> {
-        match str {
-            "get_prop" => Some(Method::GetProp),
-            "set_default" => Some(Method::SetDefault),
-            "set_power" => Some(Method::SetPower),
-            "toggle" => Some(Method::Toggle),
-            "set_bright" => Some(Method::SetBright),
-            "start_cf" => Some(Method::StartCf),
-            "stop_cf" => Some(Method::StopCf),
-            "set_scene" => Some(Method::SetScene),
-            "cron_add" => Some(Method::CronAdd),
-            "cron_get" => Some(Method::CronGet),
-            "cron_del" => Some(Method::CronDel),
-            "set_ct_abx" => Some(Method::SetCtAbx),
-            "set_rgb" => Some(Method::SetRgb),
-            _ => None,
+impl TryFrom<&str> for Method {
+    type Error = &'static str;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "get_prop" => Ok(Method::GetProp),
+            "set_default" => Ok(Method::SetDefault),
+            "set_power" => Ok(Method::SetPower),
+            "toggle" => Ok(Method::Toggle),
+            "set_bright" => Ok(Method::SetBright),
+            "start_cf" => Ok(Method::StartCf),
+            "stop_cf" => Ok(Method::StopCf),
+            "set_scene" => Ok(Method::SetScene),
+            "cron_add" => Ok(Method::CronAdd),
+            "cron_get" => Ok(Method::CronGet),
+            "cron_del" => Ok(Method::CronDel),
+            "set_ct_abx" => Ok(Method::SetCtAbx),
+            "set_rgb" => Ok(Method::SetRgb),
+            "set_hsv" => Ok(Method::SetHsv),
+            _ => Err("Doesn't match known methods."),
         }
     }
+}
 
-    pub fn to_str(&self) -> &'static str {
-        match self {
+impl From<&Method> for &str {
+    fn from(val: &Method) -> Self {
+        match val {
             Method::GetProp => "get_prop",
             Method::SetDefault => "set_default",
             Method::SetPower => "set_power",
@@ -50,6 +58,7 @@ impl Method {
             Method::CronDel => "cron_del",
             Method::SetCtAbx => "set_ct_abx",
             Method::SetRgb => "set_rgb",
+            Method::SetHsv => "set_rgb",
         }
     }
 }

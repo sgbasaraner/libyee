@@ -3,6 +3,7 @@ use crate::method::Method;
 use crate::power::Power;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::convert::TryFrom;
 
 #[derive(Debug)]
 pub struct Bulb {
@@ -65,7 +66,7 @@ impl Bulb {
         let fw_ver = response_map.get("fw_ver");
         let support = response_map.get("support").map(|s| {
             s.split(" ")
-                .flat_map(|s| Method::parse(s))
+                .flat_map(|s| Method::try_from(s))
                 .collect::<HashSet<Method>>()
         });
         let power = response_map.get("power").map(|s| Power::parse(s)).flatten();
@@ -173,7 +174,5 @@ mod tests {
         for method in methods {
             assert!(bulb.support.contains(&method));
         }
-
-        
     }
 }
