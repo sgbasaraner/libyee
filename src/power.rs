@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{convert::TryFrom, fmt};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Power {
@@ -6,12 +6,24 @@ pub enum Power {
     Off,
 }
 
-impl Power {
-    pub fn parse(str: &str) -> Option<Power> {
-        match str {
-            "on" => Some(Power::On),
-            "off" => Some(Power::Off),
-            _ => None,
+impl TryFrom<&String> for Power {
+    type Error = &'static str;
+
+    fn try_from(value: &String) -> Result<Self, Self::Error> {
+        let value = value.as_str();
+        match value {
+            "on" => Ok(Power::On),
+            "off" => Ok(Power::Off),
+            _ => Err("Doesn't match any power option."),
+        }
+    }
+}
+
+impl From<Power> for &str {
+    fn from(pow: Power) -> Self {
+        match pow {
+            Power::On => "on",
+            Power::Off => "off",
         }
     }
 }

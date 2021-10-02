@@ -69,7 +69,10 @@ impl Bulb {
                 .flat_map(|s| Method::try_from(s))
                 .collect::<HashSet<Method>>()
         });
-        let power = response_map.get("power").map(|s| Power::parse(s)).flatten();
+        let power = response_map
+            .get("power")
+            .map(|s| Power::try_from(s).ok())
+            .flatten();
         let brightness = response_map
             .get("bright")
             .map(|s| s.parse::<u8>().ok())

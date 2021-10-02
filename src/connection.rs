@@ -11,6 +11,7 @@ use crate::{
     bulb::{self, Bulb},
     lightmode::HSV,
     method::Method,
+    power::Power,
     rgb::RGB,
 };
 use rand::Rng;
@@ -207,8 +208,64 @@ impl BulbConnection {
             .collect(),
         )
     }
+
+    pub fn set_bright(
+        &mut self,
+        brightness: u8,
+        mode: TransitionMode,
+    ) -> Result<StringVecResponse, MethodCallError> {
+        if brightness > MAX_BRIGHTNESS {
+            return Err(MethodCallError::BadRequest);
+        }
+
+        let args = mode.to_method_args()?;
+        self.call_method(
+            Method::SetBright,
+            vec![MethodArg::Int(brightness as i32)]
+                .into_iter()
+                .chain(args.into_iter())
+                .collect(),
+        )
+    }
+
+    pub fn set_power(
+        &mut self,
+        power: Power,
+        trans_mode: TransitionMode,
+        power_mode: Option<PowerMode>,
+    ) -> Result<StringVecResponse, MethodCallError> {
+        let args = trans_mode.to_method_args()?;
+
+        let mut args: Vec<MethodArg> = vec![MethodArg::String(power.into())]
+            .into_iter()
+            .chain(args.into_iter())
+            .collect();
+
+        if let Some(pm) = power_mode {
+            args.push(MethodArg::Int(pm as i32));
+        }
+
+        self.call_method(Method::SetPower, args)
+    }
+
+    pub fn toggle(&mut self) -> Result<StringVecResponse, MethodCallError> {
+        self.call_method(Method::Toggle, vec![])
+    }
+
+    pub fn set_default(&mut self) -> Result<StringVecResponse, MethodCallError> {
+        self.call_method(Method::SetDefault, vec![])
+    }
 }
 
+pub enum PowerMode {
+    Ct = 1,
+    Rgb = 2,
+    Hsv = 3,
+    ColorFlow = 4,
+    NightLight = 5,
+}
+
+const MAX_BRIGHTNESS: u8 = 100;
 const MINIMUM_TRANSITION_DURATION: Duration = Duration::from_millis(30);
 const CT_MIN: u16 = 1700;
 const CT_MAX: u16 = 6500;
