@@ -7,8 +7,8 @@ pub struct RGB {
     pub b: u8,
 }
 
-impl RGB {
-    pub fn new(int: u32) -> RGB {
+impl From<u32> for RGB {
+    fn from(int: u32) -> Self {
         RGB {
             r: ((int >> 16) & 0xFF) as u8,
             g: ((int >> 8) & 0xFF) as u8,

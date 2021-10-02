@@ -36,7 +36,7 @@ impl LightMode {
                     .get("rgb")
                     .map(|rgb| rgb.parse::<u32>().ok())
                     .flatten()
-                    .map(|rgb| RGB::new(rgb))
+                    .map(|rgb| RGB::from(rgb))
                     .map(|rgb| LightMode::Color(rgb)),
                 2 => response_map
                     .get("ct")
