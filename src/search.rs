@@ -63,7 +63,7 @@ impl BulbSearcher {
 
 #[cfg(test)]
 mod tests {
-    use crate::connection::{BulbConnection, SetCtMode};
+    use crate::connection::{BulbConnection, TransitionMode};
 
     use super::BulbSearcher;
 
@@ -76,7 +76,7 @@ mod tests {
         let mut conn = BulbConnection::new(bulb).unwrap();
 
         let res = conn.get_prop(&["power", "not_exist", "bright"]).unwrap();
-        let res = conn.set_ct_abx(6500, SetCtMode::Sudden);
+        let res = conn.set_ct_abx(6500, TransitionMode::Sudden);
 
         println!("{:?}", res)
     }

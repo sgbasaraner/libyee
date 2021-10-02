@@ -17,8 +17,8 @@ impl From<u32> for RGB {
     }
 }
 
-impl From<RGB> for u32 {
-    fn from(rgb: RGB) -> Self {
+impl From<&RGB> for u32 {
+    fn from(rgb: &RGB) -> Self {
         return 65536 * (rgb.r as u32) + 256 * (rgb.g as u32) + (rgb.b as u32);
     }
 }

@@ -10,10 +10,10 @@ use std::{
 use crate::{
     bulb::{self, Bulb},
     method::Method,
+    rgb::RGB,
 };
 use rand::Rng;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde::Deserialize;
 
 pub struct BulbConnection {
     bulb: Bulb,
@@ -151,20 +151,39 @@ impl BulbConnection {
     pub fn set_ct_abx(
         &mut self,
         ct_value: u16,
-        mode: SetCtMode,
+        mode: TransitionMode,
     ) -> Result<StringVecResponse, MethodCallError> {
         if ct_value > CT_MAX || ct_value < CT_MIN {
             return Err(MethodCallError::BadRequest);
         }
 
-        let params = match mode {
-            SetCtMode::Sudden => vec![
-                MethodArg::Int(ct_value.into()),
-                MethodArg::String("sudden"),
-                MethodArg::Int(50),
-            ],
-            SetCtMode::Smooth(d) => {
-                if d < MINIMUM_SET_CT_ABX_DURATION {
+        let args = mode.to_method_args()?;
+
+        self.call_method(Method::SetCtAbx, vec![MethodArg::Int(ct_value.into())].into_iter().chain(args.into_iter()).collect())
+    }
+
+    pub fn set_rgb(&mut self, rgb: &RGB, mode: TransitionMode) -> Result<StringVecResponse, MethodCallError> {
+        let args = mode.to_method_args()?;
+
+        self.call_method(Method::SetCtAbx, vec![MethodArg::Int(u32::from(rgb) as i32)].into_iter().chain(args.into_iter()).collect())
+    }
+}
+
+const MINIMUM_TRANSITION_DURATION: Duration = Duration::from_millis(30);
+const CT_MIN: u16 = 1700;
+const CT_MAX: u16 = 6500;
+
+pub enum TransitionMode {
+    Sudden,
+    Smooth(Duration),
+}
+
+impl TransitionMode {
+    fn to_method_args(&self) -> Result<Vec<MethodArg>, MethodCallError> {
+        match self {
+            TransitionMode::Sudden => Ok(vec![MethodArg::String("sudden"), MethodArg::Int(50)]),
+            TransitionMode::Smooth(d) => {
+                if d < &MINIMUM_TRANSITION_DURATION {
                     return Err(MethodCallError::BadRequest);
                 }
 
@@ -173,25 +192,13 @@ impl BulbConnection {
                     return Err(MethodCallError::BadRequest);
                 }
 
-                vec![
-                    MethodArg::Int(ct_value.into()),
+                Ok(vec![
                     MethodArg::String("smooth"),
                     MethodArg::Int(millis.unwrap()),
-                ]
+                ])
             }
-        };
-
-        self.call_method(Method::SetCtAbx, params)
+        }
     }
-}
-
-const MINIMUM_SET_CT_ABX_DURATION: Duration = Duration::from_millis(30);
-const CT_MIN: u16 = 1700;
-const CT_MAX: u16 = 6500;
-
-pub enum SetCtMode {
-    Sudden,
-    Smooth(Duration),
 }
 
 fn create_message(id: i16, method: &Method, args: Vec<MethodArg>) -> String {
