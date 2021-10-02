@@ -255,6 +255,95 @@ impl BulbConnection {
     pub fn set_default(&mut self) -> Result<StringVecResponse, MethodCallError> {
         self.call_method(Method::SetDefault, vec![])
     }
+
+    pub fn start_cf(
+        &mut self,
+        count: u16,
+        action: CfAction,
+        flow: Vec<FlowTuple>,
+    ) -> Result<StringVecResponse, MethodCallError> {
+        let mut flow_vec: Vec<String> = Vec::with_capacity(4 * flow.len());
+
+        for tuple in flow {
+            let expr = tuple.to_expression()?;
+            for ex in expr {
+                flow_vec.push(ex.to_string());
+            }
+        }
+
+        self.call_method(
+            Method::StartCf,
+            vec![
+                MethodArg::Int(count as i32),
+                MethodArg::Int(action as i32),
+                MethodArg::String(&flow_vec.join(",")),
+            ],
+        )
+    }
+
+    pub fn stop_cf(&mut self) -> Result<StringVecResponse, MethodCallError> {
+        self.call_method(Method::StopCf, vec![])
+    }
+}
+
+pub enum CfAction {
+    Recover = 0,
+    Stay = 1,
+    TurnOff = 2,
+}
+
+pub struct FlowTuple {
+    duration: Duration,
+    mode: FlowTupleMode,
+}
+
+pub struct ColorFlowTupleMode {
+    color: RGB,
+    brightness: u8,
+}
+
+pub struct CtFlowTupleMode {
+    ct: u16,
+    brightness: u8,
+}
+
+pub enum FlowTupleMode {
+    Color(ColorFlowTupleMode),
+    Ct(CtFlowTupleMode),
+    Sleep,
+}
+
+const MINIMUM_CF_DURATION: Duration = Duration::from_millis(50);
+
+impl FlowTuple {
+    fn to_expression(&self) -> Result<Vec<u32>, MethodCallError> {
+        if self.duration < MINIMUM_CF_DURATION {
+            return Err(MethodCallError::BadRequest);
+        }
+
+        let (second_arg, third_arg, fourth_arg) = match &self.mode {
+            FlowTupleMode::Color(c) => {
+                if c.brightness > MAX_BRIGHTNESS {
+                    return Err(MethodCallError::BadRequest);
+                }
+                (1, u32::from(&c.color), c.brightness as u32)
+            }
+            FlowTupleMode::Ct(ct) => {
+                if ct.brightness > MAX_BRIGHTNESS {
+                    return Err(MethodCallError::BadRequest);
+                }
+                (2, ct.ct as u32, ct.brightness as u32)
+            }
+            FlowTupleMode::Sleep => (7, u32::MIN, u32::MIN),
+        };
+
+        return Ok(vec![
+            self.duration.as_millis() as u32,
+            second_arg,
+            third_arg,
+            fourth_arg,
+        ]);
+    }
 }
 
 pub enum PowerMode {
