@@ -33,7 +33,7 @@ mod tests {
 
         let rgb = RGB::from(u32val);
 
-        assert_eq!(u32::from(rgb), u32val);
+        assert_eq!(u32::from(&rgb), u32val);
         assert_eq!(
             rgb,
             RGB {
