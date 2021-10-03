@@ -1,25 +1,20 @@
 use std::{
     convert::TryInto,
     fmt::Debug,
-    io::{Error, Read, Write},
+    io::{self, Error, Read, Write},
     net::TcpStream,
     sync::Mutex,
     time::Duration,
 };
 
-use crate::{
-    bulb::{self, Bulb},
-    lightmode::HSV,
-    method::Method,
-    power::Power,
-    rgb::RGB,
-};
-use rand::Rng;
+use crate::{bulb::Bulb, lightmode::HSV, method::Method, power::Power, rgb::RGB};
+use rand::{prelude::ThreadRng, Rng, RngCore};
 use serde::Deserialize;
 
-pub struct BulbConnection<T: Read + Write> {
+pub struct BulbConnection<T: Read + Write, R: RngCore> {
     bulb: Bulb,
     connection: Mutex<T>,
+    rng: R,
 }
 
 enum MethodArg<'a> {
@@ -80,19 +75,19 @@ impl<'a> MethodCallResponse<'a> for StringVecResponse {
     }
 }
 
-pub type TcpConnection = BulbConnection<TcpStream>;
+pub type TcpConnection = BulbConnection<TcpStream, ThreadRng>;
 
 impl TcpConnection {
-    pub fn new(bulb: Bulb) -> Result<BulbConnection<TcpStream>, Error> {
+    pub fn new(bulb: Bulb) -> Result<Self, Error> {
         return TcpStream::connect(&bulb.ip_address).map(|connection| BulbConnection {
             bulb: bulb,
             connection: Mutex::new(connection),
+            rng: rand::thread_rng(),
         });
     }
 }
 
-impl <C: Read + Write> BulbConnection<C> {
-
+impl<C: Read + Write, R: RngCore> BulbConnection<C, R> {
     fn call_method<T>(&mut self, method: Method, args: Vec<MethodArg>) -> Result<T, MethodCallError>
     where
         for<'a> T: MethodCallResponse<'a>,
@@ -106,8 +101,7 @@ impl <C: Read + Write> BulbConnection<C> {
             .lock()
             .map_err(|_| MethodCallError::SynchronizationError)?;
 
-        let mut rng = rand::thread_rng();
-        let id: i16 = rng.gen();
+        let id: i16 = self.rng.gen();
         let message = create_message(id, &method, args);
 
         conn.write(message.as_bytes())
@@ -404,4 +398,121 @@ fn create_message(id: i16, method: &Method, args: Vec<MethodArg>) -> String {
         "]}\r\n",
     ];
     strs.join("")
+}
+
+struct MockTcpConnection {
+    when_written: String,
+    return_val: String,
+    written_val: Option<String>,
+}
+
+impl Read for MockTcpConnection {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        if self
+            .written_val
+            .clone()
+            .unwrap()
+            .trim()
+            .eq(self.when_written.trim())
+        {
+            let bytes = self.return_val.as_bytes();
+
+            for (i, elem) in buf.iter_mut().enumerate() {
+                if i >= bytes.len() {
+                    break;
+                }
+                *elem = bytes[i];
+            }
+
+            return io::Result::Ok(usize::min(bytes.len(), buf.len()));
+        }
+
+        return io::Result::Ok(0);
+    }
+}
+
+impl Write for MockTcpConnection {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let mut str = String::new();
+        let _ = buf.clone().read_to_string(&mut str);
+        self.written_val = Some(str);
+        println!("mock written: {}", self.written_val.as_ref().unwrap());
+        io::Result::Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        io::Result::Ok(())
+    }
+}
+
+macro_rules! set {
+    ( $( $x:expr ),* ) => {  // Match zero or more comma delimited items
+        {
+            let mut temp_set = std::collections::HashSet::new();  // Create a mutable HashSet
+            $(
+                temp_set.insert($x); // Insert each item matched into the HashSet
+            )*
+            temp_set // Return the populated HashSet
+        }
+    };
+}
+
+mod tests {
+    use std::sync::Mutex;
+
+    use rand::rngs::mock::{self, StepRng};
+
+    use crate::{
+        bulb::Bulb,
+        connection::{BulbConnection, MockTcpConnection},
+        lightmode::LightMode,
+        method::Method,
+    };
+
+    use super::{MethodCallError, StringVecResponse};
+
+    fn one_rng() -> StepRng {
+        mock::StepRng::new(1, 0)
+    }
+
+    fn make_bulb_with_method(method: Method) -> Bulb {
+        Bulb {
+            id: "".to_string(),
+            model: "".to_string(),
+            fw_ver: "".to_string(),
+            support: set![method],
+            power: crate::power::Power::Off,
+            bright: 0,
+            color_mode: LightMode::ColorTemperature(8),
+            name: "".to_string(),
+            ip_address: "".to_string(),
+        }
+    }
+
+    fn assert_ok_result(result: Result<StringVecResponse, MethodCallError>) {
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap().result.first().unwrap().clone(),
+            "ok".to_string()
+        );
+    }
+
+    #[test]
+    fn toggle_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"toggle\",\"params\":[]}".to_string(),
+            return_val: "{\"id\":1, \"result\":[\"ok\"]}".to_string(),
+            written_val: None,
+        };
+
+        let mock_bulb = make_bulb_with_method(Method::Toggle);
+
+        let mut conn = BulbConnection {
+            bulb: mock_bulb,
+            connection: Mutex::new(mock),
+            rng: one_rng(),
+        };
+
+        assert_ok_result(conn.toggle());
+    }
 }
