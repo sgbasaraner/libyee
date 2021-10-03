@@ -426,7 +426,6 @@ impl Read for MockTcpConnection {
 
             return io::Result::Ok(usize::min(bytes.len(), buf.len()));
         }
-
         return io::Result::Ok(0);
     }
 }
@@ -437,6 +436,7 @@ impl Write for MockTcpConnection {
         let _ = buf.clone().read_to_string(&mut str);
         self.written_val = Some(str);
         println!("mock written: {}", self.written_val.as_ref().unwrap());
+        println!("when written: {}", self.when_written);
         io::Result::Ok(buf.len())
     }
 
@@ -466,8 +466,11 @@ mod tests {
 
     use crate::{
         bulb::Bulb,
-        connection::{BulbConnection, MockTcpConnection},
-        lightmode::LightMode,
+        connection::{
+            BulbConnection, ColorFlowTupleMode, CtFlowTupleMode, FlowTuple, FlowTupleMode,
+            MockTcpConnection,
+        },
+        lightmode::{LightMode, HSV},
         method::Method,
         rgb::RGB,
     };
@@ -498,25 +501,6 @@ mod tests {
             result.unwrap().result.first().unwrap().clone(),
             "ok".to_string()
         );
-    }
-
-    #[test]
-    fn toggle_test() {
-        let mock = MockTcpConnection {
-            when_written: "{\"id\":1,\"method\":\"toggle\",\"params\":[]}".to_string(),
-            return_val: TEST_OK_VAL.to_string(),
-            written_val: None,
-        };
-
-        let mock_bulb = make_bulb_with_method(Method::Toggle);
-
-        let mut conn = BulbConnection {
-            bulb: mock_bulb,
-            connection: Mutex::new(mock),
-            rng: one_rng(),
-        };
-
-        assert_ok_result(conn.toggle());
     }
 
     #[test]
@@ -587,5 +571,152 @@ mod tests {
             TransitionMode::Smooth(Duration::from_millis(500)),
         );
         assert_ok_result(result);
+    }
+
+    #[test]
+    fn set_hsv_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"set_hsv\",\"params\":[255, 45, \"smooth\", 500]}"
+                .to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mock_bulb = make_bulb_with_method(Method::SetHsv);
+
+        let mut conn = BulbConnection {
+            bulb: mock_bulb,
+            connection: Mutex::new(mock),
+            rng: one_rng(),
+        };
+
+        let result = conn.set_hsv(
+            &HSV {
+                hue: 255,
+                saturation: 45,
+            },
+            TransitionMode::Smooth(Duration::from_millis(500)),
+        );
+        assert_ok_result(result);
+    }
+
+    #[test]
+    fn set_bright_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"set_bright\",\"params\":[50, \"smooth\", 500]}"
+                .to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mock_bulb = make_bulb_with_method(Method::SetBright);
+
+        let mut conn = BulbConnection {
+            bulb: mock_bulb,
+            connection: Mutex::new(mock),
+            rng: one_rng(),
+        };
+
+        let result = conn.set_bright(50, TransitionMode::Smooth(Duration::from_millis(500)));
+        assert_ok_result(result);
+    }
+
+    #[test]
+    fn set_power_test() {
+        let mock = MockTcpConnection {
+            when_written:
+                "{\"id\":1,\"method\":\"set_power\",\"params\":[\"on\", \"smooth\", 500]}"
+                    .to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mock_bulb = make_bulb_with_method(Method::SetPower);
+
+        let mut conn = BulbConnection {
+            bulb: mock_bulb,
+            connection: Mutex::new(mock),
+            rng: one_rng(),
+        };
+
+        let result = conn.set_power(
+            crate::power::Power::On,
+            TransitionMode::Smooth(Duration::from_millis(500)),
+            None,
+        );
+        assert_ok_result(result);
+    }
+
+    #[test]
+    fn set_default_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"set_default\",\"params\":[]}".to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mock_bulb = make_bulb_with_method(Method::SetDefault);
+
+        let mut conn = BulbConnection {
+            bulb: mock_bulb,
+            connection: Mutex::new(mock),
+            rng: one_rng(),
+        };
+
+        assert_ok_result(conn.set_default());
+    }
+
+    #[test]
+    fn start_cf_test() {
+        let mock = MockTcpConnection {
+            when_written:
+                "{\"id\":1,\"method\":\"start_cf\",\"params\":[4, 2, \"1000,2,2700,100,500,1,255,10,5000,7,0,0,500,2,5000,1\"]}"
+                    .to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mock_bulb = make_bulb_with_method(Method::StartCf);
+
+        let mut conn = BulbConnection {
+            bulb: mock_bulb,
+            connection: Mutex::new(mock),
+            rng: one_rng(),
+        };
+
+        let ctf_mode_1 = CtFlowTupleMode {
+            ct: 2700,
+            brightness: 100,
+        };
+        let cf_mode = ColorFlowTupleMode {
+            color: RGB { r: 0, g: 0, b: 255 },
+            brightness: 10,
+        };
+        let ctf_mode_2 = CtFlowTupleMode {
+            ct: 5000,
+            brightness: 1,
+        };
+        assert_ok_result(conn.start_cf(
+            4,
+            super::CfAction::TurnOff,
+            vec![
+                FlowTuple {
+                    duration: Duration::from_millis(1000),
+                    mode: FlowTupleMode::Ct(ctf_mode_1),
+                },
+                FlowTuple {
+                    duration: Duration::from_millis(500),
+                    mode: FlowTupleMode::Color(cf_mode),
+                },
+                FlowTuple {
+                    duration: Duration::from_millis(5000),
+                    mode: FlowTupleMode::Sleep,
+                },
+                FlowTuple {
+                    duration: Duration::from_millis(500),
+                    mode: FlowTupleMode::Ct(ctf_mode_2),
+                },
+            ],
+        ));
     }
 }

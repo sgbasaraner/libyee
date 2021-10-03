@@ -58,7 +58,7 @@ impl From<&Method> for &str {
             Method::CronDel => "cron_del",
             Method::SetCtAbx => "set_ct_abx",
             Method::SetRgb => "set_rgb",
-            Method::SetHsv => "set_rgb",
+            Method::SetHsv => "set_hsv",
         }
     }
 }
