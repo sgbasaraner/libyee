@@ -469,6 +469,7 @@ mod tests {
         connection::{BulbConnection, MockTcpConnection},
         lightmode::LightMode,
         method::Method,
+        rgb::RGB,
     };
 
     use super::{MethodCallError, StringVecResponse, TransitionMode, TEST_OK_VAL};
@@ -561,7 +562,30 @@ mod tests {
         };
 
         let result = conn.set_ct_abx(3500, TransitionMode::Smooth(Duration::from_millis(500)));
-        println!("{:?}", result);
+        assert_ok_result(result);
+    }
+
+    #[test]
+    fn set_rgb_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"set_rgb\",\"params\":[255, \"smooth\", 500]}"
+                .to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mock_bulb = make_bulb_with_method(Method::SetRgb);
+
+        let mut conn = BulbConnection {
+            bulb: mock_bulb,
+            connection: Mutex::new(mock),
+            rng: one_rng(),
+        };
+
+        let result = conn.set_rgb(
+            &RGB { r: 0, g: 0, b: 255 },
+            TransitionMode::Smooth(Duration::from_millis(500)),
+        );
         assert_ok_result(result);
     }
 }
