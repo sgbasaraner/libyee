@@ -457,8 +457,10 @@ macro_rules! set {
     };
 }
 
+const TEST_OK_VAL: &str = "{\"id\":1, \"result\":[\"ok\"]}";
+
 mod tests {
-    use std::sync::Mutex;
+    use std::{sync::Mutex, time::Duration};
 
     use rand::rngs::mock::{self, StepRng};
 
@@ -469,7 +471,7 @@ mod tests {
         method::Method,
     };
 
-    use super::{MethodCallError, StringVecResponse};
+    use super::{MethodCallError, StringVecResponse, TransitionMode, TEST_OK_VAL};
 
     fn one_rng() -> StepRng {
         mock::StepRng::new(1, 0)
@@ -501,7 +503,7 @@ mod tests {
     fn toggle_test() {
         let mock = MockTcpConnection {
             when_written: "{\"id\":1,\"method\":\"toggle\",\"params\":[]}".to_string(),
-            return_val: "{\"id\":1, \"result\":[\"ok\"]}".to_string(),
+            return_val: TEST_OK_VAL.to_string(),
             written_val: None,
         };
 
@@ -539,5 +541,27 @@ mod tests {
             assert_eq!(res.clone().result.get(1).unwrap(), "");
             assert_eq!(res.clone().result.get(2).unwrap(), "100");
         }
+    }
+
+    #[test]
+    fn set_ct_abx_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"set_ct_abx\",\"params\":[3500, \"smooth\", 500]}"
+                .to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mock_bulb = make_bulb_with_method(Method::SetCtAbx);
+
+        let mut conn = BulbConnection {
+            bulb: mock_bulb,
+            connection: Mutex::new(mock),
+            rng: one_rng(),
+        };
+
+        let result = conn.set_ct_abx(3500, TransitionMode::Smooth(Duration::from_millis(500)));
+        println!("{:?}", result);
+        assert_ok_result(result);
     }
 }
