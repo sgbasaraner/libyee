@@ -135,29 +135,14 @@ impl<'a> SendRecvable for MockSendRecvable<'a> {
     }
 }
 
-macro_rules! set {
-    ( $( $x:expr ),* ) => {  // Match zero or more comma delimited items
-        {
-            let mut temp_set = HashSet::new();  // Create a mutable HashSet
-            $(
-                temp_set.insert($x); // Insert each item matched into the HashSet
-            )*
-            temp_set // Return the populated HashSet
-        }
-    };
-}
-
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashSet, ops::{Div, Mul}, time::{Duration, Instant}};
-
-    use crate::{
-        bulb::Bulb,
-        connection::{BulbConnection, TransitionMode},
-        lightmode::LightMode,
-        method::Method,
-        search::MockSendRecvable,
+    use std::{
+        ops::{Div, Mul},
+        time::Duration,
     };
+
+    use crate::search::MockSendRecvable;
 
     use super::BulbSearcher;
 
