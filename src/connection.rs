@@ -63,7 +63,7 @@ pub struct BulbErrorResponse {
     message: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct StringVecResponse {
     id: i16,
     result: Vec<String>,
@@ -142,7 +142,7 @@ impl<C: Read + Write, R: RngCore> BulbConnection<C, R> {
 
         let args = props.iter().map(|p| MethodArg::String(*p)).collect();
 
-        self.call_method(Method::SetCtAbx, args)
+        self.call_method(Method::GetProp, args)
     }
 
     /// This method is used to change the color temperature of a smart LED.
@@ -514,5 +514,30 @@ mod tests {
         };
 
         assert_ok_result(conn.toggle());
+    }
+
+    #[test]
+    fn get_prop_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"get_prop\",\"params\":[\"power\", \"not_exist\", \"bright\"]}".to_string(),
+            return_val: "{\"id\":1, \"result\":[\"on\", \"\", \"100\"]}".to_string(),
+            written_val: None,
+        };
+
+        let mock_bulb = make_bulb_with_method(Method::GetProp);
+
+        let mut conn = BulbConnection {
+            bulb: mock_bulb,
+            connection: Mutex::new(mock),
+            rng: one_rng(),
+        };
+
+        let result = conn.get_prop(&["power", "not_exist", "bright"]);
+        assert!(result.is_ok());
+        if let Ok(res) = result {
+            assert_eq!(res.clone().result.first().unwrap(), "on");
+            assert_eq!(res.clone().result.get(1).unwrap(), "");
+            assert_eq!(res.clone().result.get(2).unwrap(), "100");
+        }
     }
 }
