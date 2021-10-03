@@ -17,9 +17,9 @@ use crate::{
 use rand::Rng;
 use serde::Deserialize;
 
-pub struct BulbConnection {
+pub struct BulbConnection<T: Read + Write> {
     bulb: Bulb,
-    connection: Mutex<TcpStream>,
+    connection: Mutex<T>,
 }
 
 enum MethodArg<'a> {
@@ -80,13 +80,18 @@ impl<'a> MethodCallResponse<'a> for StringVecResponse {
     }
 }
 
-impl BulbConnection {
-    pub fn new(bulb: Bulb) -> Result<BulbConnection, Error> {
+pub type TcpConnection = BulbConnection<TcpStream>;
+
+impl TcpConnection {
+    pub fn new(bulb: Bulb) -> Result<BulbConnection<TcpStream>, Error> {
         return TcpStream::connect(&bulb.ip_address).map(|connection| BulbConnection {
             bulb: bulb,
             connection: Mutex::new(connection),
         });
     }
+}
+
+impl <C: Read + Write> BulbConnection<C> {
 
     fn call_method<T>(&mut self, method: Method, args: Vec<MethodArg>) -> Result<T, MethodCallError>
     where
