@@ -507,7 +507,7 @@ mod tests {
         method: Method,
         mock: MockTcpConnection,
     ) -> BulbConnection<MockTcpConnection, StepRng> {
-        let mock_bulb = make_bulb_with_method(Method::GetProp);
+        let mock_bulb = make_bulb_with_method(method);
 
         return BulbConnection {
             bulb: mock_bulb,
@@ -683,5 +683,18 @@ mod tests {
                 },
             ],
         ));
+    }
+
+    #[test]
+    fn stop_cf() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"stop_cf\",\"params\":[]}".to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::StopCf, mock);
+
+        println!("{:?}", conn.stop_cf());
     }
 }
