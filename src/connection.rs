@@ -17,12 +17,12 @@ pub struct BulbConnection<T: Read + Write, R: RngCore> {
     rng: R,
 }
 
-enum MethodArg<'a> {
-    String(&'a str),
+enum MethodArg {
+    String(String),
     Int(i32),
 }
 
-impl MethodArg<'_> {
+impl MethodArg {
     fn to_str(&self) -> String {
         match self {
             MethodArg::String(str) => {
@@ -140,7 +140,10 @@ impl<C: Read + Write, R: RngCore> BulbConnection<C, R> {
             return Err(MethodCallError::BadRequest);
         }
 
-        let args = props.iter().map(|p| MethodArg::String(*p)).collect();
+        let args = props
+            .iter()
+            .map(|p| MethodArg::String(p.to_string()))
+            .collect();
 
         self.call_method(Method::GetProp, args)
     }
@@ -255,40 +258,130 @@ impl<C: Read + Write, R: RngCore> BulbConnection<C, R> {
         self.call_method(Method::SetDefault, vec![])
     }
 
-    pub fn start_cf(
-        &mut self,
-        count: u16,
-        action: CfAction,
-        flow: Vec<FlowTuple>,
-    ) -> Result<StringVecResponse, MethodCallError> {
-        let mut flow_vec: Vec<String> = Vec::with_capacity(4 * flow.len());
+    pub fn start_cf(&mut self, cf: &ColorFlow) -> Result<StringVecResponse, MethodCallError> {
+        cf.params()
+            .and_then(|p| self.call_method(Method::StartCf, p))
+    }
 
-        for tuple in flow {
+    pub fn stop_cf(&mut self) -> Result<StringVecResponse, MethodCallError> {
+        self.call_method(Method::StopCf, vec![])
+    }
+
+    pub fn set_scene(&mut self, scene: &Scene) -> Result<StringVecResponse, MethodCallError> {
+        scene
+            .params()
+            .and_then(|p| self.call_method(Method::SetScene, p))
+    }
+}
+
+pub enum CfAction {
+    Recover,
+    Stay,
+    TurnOff,
+}
+
+impl CfAction {
+    const fn val(&self) -> i32 {
+        match self {
+            CfAction::Recover => 0,
+            CfAction::Stay => 1,
+            CfAction::TurnOff => 2,
+        }
+    }
+}
+
+pub enum Scene<'a, 'b> {
+    Color(&'a RGB, Brightness),
+    HSV(&'a HSV, Brightness),
+    Ct(Ct, Brightness),
+    Cf(&'b ColorFlow),
+
+    /// brightness, minutes
+    AutoDelayOff(Brightness, u32),
+}
+
+impl<'a, 'b> Scene<'a, 'b> {
+    const fn val(&self) -> &str {
+        match self {
+            Scene::Color(_, _) => "color",
+            Scene::HSV(_, _) => "hsv",
+            Scene::Ct(_, _) => "ct",
+            Scene::Cf(_) => "cf",
+            Scene::AutoDelayOff(_, _) => "auto_delay_off",
+        }
+    }
+
+    fn params(&self) -> Result<Vec<MethodArg>, MethodCallError> {
+        match self {
+            Scene::Color(rgb, brightness) => Ok(vec![
+                MethodArg::String(self.val().to_string()),
+                MethodArg::Int(u32::from(*rgb) as i32),
+                MethodArg::Int(*brightness as i32),
+            ]),
+            Scene::HSV(hsv, brightness) => Ok(vec![
+                MethodArg::String(self.val().to_string()),
+                MethodArg::Int(hsv.hue as i32),
+                MethodArg::Int(hsv.saturation as i32),
+                MethodArg::Int(*brightness as i32),
+            ]),
+            Scene::Ct(ct, brightness) => Ok(vec![
+                MethodArg::String(self.val().to_string()),
+                MethodArg::Int(*ct as i32),
+                MethodArg::Int(*brightness as i32),
+            ]),
+            Scene::Cf(cf) => cf.params().map(|p| {
+                let mut args = vec![MethodArg::String(self.val().to_string())];
+
+                for param in p {
+                    args.push(param);
+                }
+
+                args
+            }),
+            Scene::AutoDelayOff(brightness, duration_min) => {
+                if *duration_min < MIN_AUTO_DELAY_OFF_MINUTES as u32 {
+                    return Err(MethodCallError::BadRequest);
+                }
+
+                if *brightness > MAX_BRIGHTNESS {
+                    return Err(MethodCallError::BadRequest);
+                }
+
+                Ok(vec![
+                    MethodArg::String(self.val().to_string()),
+                    MethodArg::Int(*brightness as i32),
+                    MethodArg::Int(*duration_min as i32),
+                ])
+            }
+        }
+    }
+}
+
+const MIN_AUTO_DELAY_OFF_MINUTES: u8 = 1;
+
+pub struct ColorFlow {
+    count: u16,
+    action: CfAction,
+    sequence: Vec<FlowTuple>,
+}
+
+impl ColorFlow {
+    fn params(&self) -> Result<Vec<MethodArg>, MethodCallError> {
+        let mut flow_vec: Vec<String> = Vec::with_capacity(4 * self.sequence.len());
+
+        for tuple in &self.sequence {
             let expr = tuple.to_expression()?;
             for ex in expr {
                 flow_vec.push(ex.to_string());
             }
         }
 
-        self.call_method(
-            Method::StartCf,
-            vec![
-                MethodArg::Int(count as i32),
-                MethodArg::Int(action as i32),
-                MethodArg::String(&flow_vec.join(",")),
-            ],
-        )
+        Ok(vec![
+            MethodArg::Int(self.count as i32),
+            MethodArg::Int(self.action.val()),
+            MethodArg::String(flow_vec.join(",")),
+        ])
     }
-
-    pub fn stop_cf(&mut self) -> Result<StringVecResponse, MethodCallError> {
-        self.call_method(Method::StopCf, vec![])
-    }
-}
-
-pub enum CfAction {
-    Recover = 0,
-    Stay = 1,
-    TurnOff = 2,
 }
 
 pub struct FlowTuple {
@@ -298,12 +391,15 @@ pub struct FlowTuple {
 
 pub struct ColorFlowTupleMode {
     color: RGB,
-    brightness: u8,
+    brightness: Brightness,
 }
 
+pub type Ct = u16;
+pub type Brightness = u8;
+
 pub struct CtFlowTupleMode {
-    ct: u16,
-    brightness: u8,
+    ct: Ct,
+    brightness: Brightness,
 }
 
 pub enum FlowTupleMode {
@@ -366,7 +462,10 @@ pub enum TransitionMode {
 impl TransitionMode {
     fn to_method_args(&self) -> Result<Vec<MethodArg>, MethodCallError> {
         match self {
-            TransitionMode::Sudden => Ok(vec![MethodArg::String("sudden"), MethodArg::Int(50)]),
+            TransitionMode::Sudden => Ok(vec![
+                MethodArg::String("sudden".to_string()),
+                MethodArg::Int(50),
+            ]),
             TransitionMode::Smooth(d) => {
                 if d < &MINIMUM_TRANSITION_DURATION {
                     return Err(MethodCallError::BadRequest);
@@ -378,7 +477,7 @@ impl TransitionMode {
                 }
 
                 Ok(vec![
-                    MethodArg::String("smooth"),
+                    MethodArg::String("smooth".to_string()),
                     MethodArg::Int(millis.unwrap()),
                 ])
             }
@@ -467,15 +566,15 @@ mod tests {
     use crate::{
         bulb::Bulb,
         connection::{
-            BulbConnection, ColorFlowTupleMode, CtFlowTupleMode, FlowTuple, FlowTupleMode,
-            MockTcpConnection,
+            BulbConnection, ColorFlow, ColorFlowTupleMode, CtFlowTupleMode, FlowTuple,
+            FlowTupleMode, MockTcpConnection,
         },
         lightmode::{LightMode, HSV},
         method::Method,
         rgb::RGB,
     };
 
-    use super::{MethodCallError, StringVecResponse, TransitionMode, TEST_OK_VAL};
+    use super::{MethodCallError, Scene, StringVecResponse, TransitionMode, TEST_OK_VAL};
 
     fn one_rng() -> StepRng {
         mock::StepRng::new(1, 0)
@@ -661,10 +760,10 @@ mod tests {
             ct: 5000,
             brightness: 1,
         };
-        assert_ok_result(conn.start_cf(
-            4,
-            super::CfAction::TurnOff,
-            vec![
+        assert_ok_result(conn.start_cf(&ColorFlow {
+            count: 4,
+            action: super::CfAction::TurnOff,
+            sequence: vec![
                 FlowTuple {
                     duration: Duration::from_millis(1000),
                     mode: FlowTupleMode::Ct(ctf_mode_1),
@@ -682,11 +781,11 @@ mod tests {
                     mode: FlowTupleMode::Ct(ctf_mode_2),
                 },
             ],
-        ));
+        }));
     }
 
     #[test]
-    fn stop_cf() {
+    fn stop_cf_test() {
         let mock = MockTcpConnection {
             when_written: "{\"id\":1,\"method\":\"stop_cf\",\"params\":[]}".to_string(),
             return_val: TEST_OK_VAL.to_string(),
@@ -695,6 +794,119 @@ mod tests {
 
         let mut conn = conn_with_method(Method::StopCf, mock);
 
-        println!("{:?}", conn.stop_cf());
+        assert_ok_result(conn.stop_cf());
+    }
+
+    #[test]
+    fn set_scene_color_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"set_scene\",\"params\":[\"color\", 65280, 70]}"
+                .to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::SetScene, mock);
+
+        assert_ok_result(conn.set_scene(&Scene::Color(&RGB { r: 0, g: 255, b: 0 }, 70)));
+    }
+
+    #[test]
+    fn set_scene_hsv_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"set_scene\",\"params\":[\"hsv\", 300, 70, 100]}"
+                .to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::SetScene, mock);
+
+        assert_ok_result(conn.set_scene(&Scene::HSV(
+            &HSV {
+                hue: 300,
+                saturation: 70,
+            },
+            100,
+        )));
+    }
+
+    #[test]
+    fn set_scene_ct_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"set_scene\",\"params\":[\"ct\", 5400, 100]}"
+                .to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::SetScene, mock);
+
+        assert_ok_result(conn.set_scene(&Scene::Ct(5400, 100)));
+    }
+
+    #[test]
+    fn set_scene_cf_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"set_scene\",\"params\":[\"cf\", 0, 0, \"1000,2,2700,100,500,1,255,10,5000,7,0,0,500,2,5000,1\"]}"
+                .to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let ctf_mode_1 = CtFlowTupleMode {
+            ct: 2700,
+            brightness: 100,
+        };
+        let cf_mode = ColorFlowTupleMode {
+            color: RGB { r: 0, g: 0, b: 255 },
+            brightness: 10,
+        };
+        let ctf_mode_2 = CtFlowTupleMode {
+            ct: 5000,
+            brightness: 1,
+        };
+
+        let cf = ColorFlow {
+            count: 0,
+            action: super::CfAction::Recover,
+            sequence: vec![
+                FlowTuple {
+                    duration: Duration::from_millis(1000),
+                    mode: FlowTupleMode::Ct(ctf_mode_1),
+                },
+                FlowTuple {
+                    duration: Duration::from_millis(500),
+                    mode: FlowTupleMode::Color(cf_mode),
+                },
+                FlowTuple {
+                    duration: Duration::from_millis(5000),
+                    mode: FlowTupleMode::Sleep,
+                },
+                FlowTuple {
+                    duration: Duration::from_millis(500),
+                    mode: FlowTupleMode::Ct(ctf_mode_2),
+                },
+            ],
+        };
+
+        let mut conn = conn_with_method(Method::SetScene, mock);
+
+        assert_ok_result(conn.set_scene(&Scene::Cf(&cf)));
+    }
+
+    #[test]
+    fn set_scene_auto_delay_off_test() {
+        let mock = MockTcpConnection {
+            when_written:
+                "{\"id\":1,\"method\":\"set_scene\",\"params\":[\"auto_delay_off\", 50, 5]}"
+                    .to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::SetScene, mock);
+
+        assert_ok_result(conn.set_scene(&Scene::AutoDelayOff(50, 5)));
     }
 }

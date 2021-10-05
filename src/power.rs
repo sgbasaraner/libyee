@@ -19,11 +19,11 @@ impl TryFrom<&String> for Power {
     }
 }
 
-impl From<Power> for &str {
+impl From<Power> for String {
     fn from(pow: Power) -> Self {
         match pow {
-            Power::On => "on",
-            Power::Off => "off",
+            Power::On => "on".to_string(),
+            Power::Off => "off".to_string(),
         }
     }
 }
