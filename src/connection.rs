@@ -503,6 +503,19 @@ mod tests {
         );
     }
 
+    fn conn_with_method(
+        method: Method,
+        mock: MockTcpConnection,
+    ) -> BulbConnection<MockTcpConnection, StepRng> {
+        let mock_bulb = make_bulb_with_method(Method::GetProp);
+
+        return BulbConnection {
+            bulb: mock_bulb,
+            connection: Mutex::new(mock),
+            rng: one_rng(),
+        };
+    }
+
     #[test]
     fn get_prop_test() {
         let mock = MockTcpConnection {
@@ -511,13 +524,7 @@ mod tests {
             written_val: None,
         };
 
-        let mock_bulb = make_bulb_with_method(Method::GetProp);
-
-        let mut conn = BulbConnection {
-            bulb: mock_bulb,
-            connection: Mutex::new(mock),
-            rng: one_rng(),
-        };
+        let mut conn = conn_with_method(Method::GetProp, mock);
 
         let result = conn.get_prop(&["power", "not_exist", "bright"]);
         assert!(result.is_ok());
@@ -537,13 +544,7 @@ mod tests {
             written_val: None,
         };
 
-        let mock_bulb = make_bulb_with_method(Method::SetCtAbx);
-
-        let mut conn = BulbConnection {
-            bulb: mock_bulb,
-            connection: Mutex::new(mock),
-            rng: one_rng(),
-        };
+        let mut conn = conn_with_method(Method::SetCtAbx, mock);
 
         let result = conn.set_ct_abx(3500, TransitionMode::Smooth(Duration::from_millis(500)));
         assert_ok_result(result);
@@ -558,13 +559,7 @@ mod tests {
             written_val: None,
         };
 
-        let mock_bulb = make_bulb_with_method(Method::SetRgb);
-
-        let mut conn = BulbConnection {
-            bulb: mock_bulb,
-            connection: Mutex::new(mock),
-            rng: one_rng(),
-        };
+        let mut conn = conn_with_method(Method::SetRgb, mock);
 
         let result = conn.set_rgb(
             &RGB { r: 0, g: 0, b: 255 },
@@ -582,13 +577,7 @@ mod tests {
             written_val: None,
         };
 
-        let mock_bulb = make_bulb_with_method(Method::SetHsv);
-
-        let mut conn = BulbConnection {
-            bulb: mock_bulb,
-            connection: Mutex::new(mock),
-            rng: one_rng(),
-        };
+        let mut conn = conn_with_method(Method::SetHsv, mock);
 
         let result = conn.set_hsv(
             &HSV {
@@ -609,13 +598,7 @@ mod tests {
             written_val: None,
         };
 
-        let mock_bulb = make_bulb_with_method(Method::SetBright);
-
-        let mut conn = BulbConnection {
-            bulb: mock_bulb,
-            connection: Mutex::new(mock),
-            rng: one_rng(),
-        };
+        let mut conn = conn_with_method(Method::SetBright, mock);
 
         let result = conn.set_bright(50, TransitionMode::Smooth(Duration::from_millis(500)));
         assert_ok_result(result);
@@ -631,13 +614,7 @@ mod tests {
             written_val: None,
         };
 
-        let mock_bulb = make_bulb_with_method(Method::SetPower);
-
-        let mut conn = BulbConnection {
-            bulb: mock_bulb,
-            connection: Mutex::new(mock),
-            rng: one_rng(),
-        };
+        let mut conn = conn_with_method(Method::SetPower, mock);
 
         let result = conn.set_power(
             crate::power::Power::On,
@@ -655,13 +632,7 @@ mod tests {
             written_val: None,
         };
 
-        let mock_bulb = make_bulb_with_method(Method::SetDefault);
-
-        let mut conn = BulbConnection {
-            bulb: mock_bulb,
-            connection: Mutex::new(mock),
-            rng: one_rng(),
-        };
+        let mut conn = conn_with_method(Method::SetDefault, mock);
 
         assert_ok_result(conn.set_default());
     }
@@ -676,13 +647,7 @@ mod tests {
             written_val: None,
         };
 
-        let mock_bulb = make_bulb_with_method(Method::StartCf);
-
-        let mut conn = BulbConnection {
-            bulb: mock_bulb,
-            connection: Mutex::new(mock),
-            rng: one_rng(),
-        };
+        let mut conn = conn_with_method(Method::StartCf, mock);
 
         let ctf_mode_1 = CtFlowTupleMode {
             ct: 2700,
