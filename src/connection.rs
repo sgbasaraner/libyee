@@ -1,5 +1,5 @@
 use std::{
-    convert::TryInto,
+    convert::{TryFrom, TryInto},
     fmt::Debug,
     io::{self, Error, Read, Write},
     net::TcpStream,
@@ -67,6 +67,40 @@ pub struct BulbErrorResponse {
 pub struct StringVecResponse {
     id: i16,
     result: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct CronResult {
+    #[serde(rename(serialize = "type", deserialize = "type"))]
+    cron_type: i32,
+    delay: u16,
+    mix: i32,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct CronResponse {
+    id: i16,
+    result: Vec<CronResult>,
+}
+
+impl TryFrom<CronResult> for Cron {
+    type Error = String;
+
+    fn try_from(value: CronResult) -> Result<Self, Self::Error> {
+        if value.cron_type != 0 {
+            return Err("Unsupported cron type.".to_string());
+        }
+        Ok(Cron {
+            cron_type: CronType::PowerOff,
+            minutes: value.delay,
+        })
+    }
+}
+
+impl<'a> MethodCallResponse<'a> for CronResponse {
+    fn id(&self) -> i16 {
+        self.id
+    }
 }
 
 impl<'a> MethodCallResponse<'a> for StringVecResponse {
@@ -272,6 +306,26 @@ impl<C: Read + Write, R: RngCore> BulbConnection<C, R> {
             .params()
             .and_then(|p| self.call_method(Method::SetScene, p))
     }
+
+    /// Usage: This method is used to start a timer job on the smart LED.
+    pub fn cron_add(&mut self, cron: &Cron) -> Result<StringVecResponse, MethodCallError> {
+        self.call_method(
+            Method::CronAdd,
+            vec![MethodArg::Int(0), MethodArg::Int(cron.minutes as i32)],
+        )
+    }
+
+    pub fn cron_get(&mut self, cron_type: &CronType) -> Result<CronResponse, MethodCallError> {
+        self.call_method(Method::CronGet, vec![MethodArg::Int(0)])
+    }
+
+    pub fn cron_del(&mut self, cron_type: &CronType) -> Result<StringVecResponse, MethodCallError> {
+        self.call_method(Method::CronDel, vec![MethodArg::Int(0)])
+    }
+}
+
+pub enum CronType {
+    PowerOff,
 }
 
 pub enum CfAction {
@@ -297,7 +351,7 @@ pub enum Scene<'a, 'b> {
     Cf(&'b ColorFlow),
 
     /// brightness, minutes
-    AutoDelayOff(Brightness, u32),
+    AutoDelayOff(Brightness, u16),
 }
 
 impl<'a, 'b> Scene<'a, 'b> {
@@ -339,7 +393,7 @@ impl<'a, 'b> Scene<'a, 'b> {
                 args
             }),
             Scene::AutoDelayOff(brightness, duration_min) => {
-                if *duration_min < MIN_AUTO_DELAY_OFF_MINUTES as u32 {
+                if *duration_min < MIN_AUTO_DELAY_OFF_MINUTES as u16 {
                     return Err(MethodCallError::BadRequest);
                 }
 
@@ -382,6 +436,11 @@ impl ColorFlow {
             MethodArg::String(flow_vec.join(",")),
         ])
     }
+}
+
+pub struct Cron {
+    cron_type: CronType,
+    minutes: u16,
 }
 
 pub struct FlowTuple {
@@ -559,7 +618,7 @@ macro_rules! set {
 const TEST_OK_VAL: &str = "{\"id\":1, \"result\":[\"ok\"]}";
 
 mod tests {
-    use std::{sync::Mutex, time::Duration};
+    use std::{result, sync::Mutex, time::Duration};
 
     use rand::rngs::mock::{self, StepRng};
 
@@ -574,7 +633,9 @@ mod tests {
         rgb::RGB,
     };
 
-    use super::{MethodCallError, Scene, StringVecResponse, TransitionMode, TEST_OK_VAL};
+    use super::{
+        Cron, CronType, MethodCallError, Scene, StringVecResponse, TransitionMode, TEST_OK_VAL,
+    };
 
     fn one_rng() -> StepRng {
         mock::StepRng::new(1, 0)
@@ -908,5 +969,56 @@ mod tests {
         let mut conn = conn_with_method(Method::SetScene, mock);
 
         assert_ok_result(conn.set_scene(&Scene::AutoDelayOff(50, 5)));
+    }
+
+    #[test]
+    fn cron_add_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"cron_add\",\"params\":[0, 14]}".to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::CronAdd, mock);
+
+        assert_ok_result(conn.cron_add(&Cron {
+            cron_type: CronType::PowerOff,
+            minutes: 14,
+        }));
+    }
+
+    #[test]
+    fn cron_get_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"cron_get\",\"params\":[0]}".to_string(),
+            return_val: "{\"id\":1,\"result\":[{\"type\": 0, \"delay\": 15, \"mix\": 0}]}"
+                .to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::CronGet, mock);
+
+        let result = conn.cron_get(&CronType::PowerOff);
+
+        assert!(result.is_ok());
+
+        let result = result.unwrap();
+
+        assert_eq!(result.result.first().unwrap().cron_type, 0);
+        assert_eq!(result.result.first().unwrap().mix, 0);
+        assert_eq!(result.result.first().unwrap().delay, 15);
+    }
+
+    #[test]
+    fn cron_del() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"cron_del\",\"params\":[0]}".to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::CronDel, mock);
+
+        assert_ok_result(conn.cron_del(&CronType::PowerOff));
     }
 }
