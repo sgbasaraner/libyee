@@ -338,6 +338,26 @@ impl<C: Read + Write, R: RngCore> BulbConnection<C, R> {
             ],
         )
     }
+
+    pub fn set_music(&mut self, mode: MusicMode) -> Result<StringVecResponse, MethodCallError> {
+        let method = Method::SetMusic;
+        match mode {
+            MusicMode::On(ip_address, port) => self.call_method(
+                method,
+                vec![
+                    MethodArg::Int(1),
+                    MethodArg::String(ip_address.to_string()),
+                    MethodArg::Int(port as i32),
+                ],
+            ),
+            MusicMode::Off => self.call_method(method, vec![MethodArg::Int(0)]),
+        }
+    }
+}
+
+pub enum MusicMode<'a> {
+    On(&'a str, usize),
+    Off,
 }
 
 pub enum AdjustableProp {
@@ -682,7 +702,8 @@ mod tests {
     };
 
     use super::{
-        Cron, CronType, MethodCallError, Scene, StringVecResponse, TransitionMode, TEST_OK_VAL,
+        Cron, CronType, MethodCallError, MusicMode, Scene, StringVecResponse, TransitionMode,
+        TEST_OK_VAL,
     };
 
     fn one_rng() -> StepRng {
@@ -1084,5 +1105,33 @@ mod tests {
         assert_ok_result(
             conn.set_adjust(&super::AdjustableProp::Ct, &super::AdjustAction::Increase),
         );
+    }
+
+    #[test]
+    fn set_music_on_test() {
+        let mock = MockTcpConnection {
+            when_written:
+                "{\"id\":1,\"method\":\"set_music\",\"params\":[1, \"192.168.0.2\", 54321]}"
+                    .to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::SetMusic, mock);
+
+        assert_ok_result(conn.set_music(MusicMode::On("192.168.0.2", 54321)));
+    }
+
+    #[test]
+    fn set_music_off_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"set_music\",\"params\":[0]}".to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::SetMusic, mock);
+
+        assert_ok_result(conn.set_music(MusicMode::Off));
     }
 }
