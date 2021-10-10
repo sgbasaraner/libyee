@@ -353,6 +353,10 @@ impl<C: Read + Write, R: RngCore> BulbConnection<C, R> {
             MusicMode::Off => self.call_method(method, vec![MethodArg::Int(0)]),
         }
     }
+
+    pub fn set_name(&mut self, name: &str) -> Result<StringVecResponse, MethodCallError> {
+        self.call_method(Method::SetName, vec![MethodArg::String(name.to_string())])
+    }
 }
 
 pub enum MusicMode<'a> {
@@ -1133,5 +1137,18 @@ mod tests {
         let mut conn = conn_with_method(Method::SetMusic, mock);
 
         assert_ok_result(conn.set_music(MusicMode::Off));
+    }
+
+    #[test]
+    fn set_name_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"set_name\",\"params\":[\"my_bulb\"]}".to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::SetName, mock);
+
+        assert_ok_result(conn.set_name("my_bulb"));
     }
 }
