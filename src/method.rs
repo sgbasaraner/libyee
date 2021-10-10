@@ -16,6 +16,7 @@ pub enum Method {
     SetCtAbx,
     SetRgb,
     SetHsv,
+    SetAdjust,
 }
 
 impl TryFrom<&str> for Method {
@@ -37,6 +38,7 @@ impl TryFrom<&str> for Method {
             "set_ct_abx" => Ok(Method::SetCtAbx),
             "set_rgb" => Ok(Method::SetRgb),
             "set_hsv" => Ok(Method::SetHsv),
+            "set_adjust" => Ok(Method::SetAdjust),
             _ => Err("Doesn't match known methods."),
         }
     }
@@ -59,6 +61,7 @@ impl From<&Method> for &str {
             Method::SetCtAbx => "set_ct_abx",
             Method::SetRgb => "set_rgb",
             Method::SetHsv => "set_hsv",
+            Method::SetAdjust => "set_adjust",
         }
     }
 }

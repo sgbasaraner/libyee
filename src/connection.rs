@@ -322,6 +322,54 @@ impl<C: Read + Write, R: RngCore> BulbConnection<C, R> {
     pub fn cron_del(&mut self, cron_type: &CronType) -> Result<StringVecResponse, MethodCallError> {
         self.call_method(Method::CronDel, vec![MethodArg::Int(0)])
     }
+
+    pub fn set_adjust(
+        &mut self,
+        prop: &AdjustableProp,
+        action: &AdjustAction,
+    ) -> Result<StringVecResponse, MethodCallError> {
+        let action_str: &str = action.into();
+        let prop_str: &str = prop.into();
+        self.call_method(
+            Method::SetAdjust,
+            vec![
+                MethodArg::String(action_str.to_string()),
+                MethodArg::String(prop_str.to_string()),
+            ],
+        )
+    }
+}
+
+pub enum AdjustableProp {
+    Brightness,
+    Ct,
+    Color,
+}
+
+impl From<&AdjustableProp> for &str {
+    fn from(a: &AdjustableProp) -> Self {
+        match a {
+            AdjustableProp::Brightness => "bright",
+            AdjustableProp::Ct => "ct",
+            AdjustableProp::Color => "color",
+        }
+    }
+}
+
+pub enum AdjustAction {
+    Increase,
+    Decrease,
+    Circle,
+}
+
+impl From<&AdjustAction> for &str {
+    fn from(a: &AdjustAction) -> Self {
+        match a {
+            AdjustAction::Increase => "increase",
+            AdjustAction::Decrease => "decrease",
+            AdjustAction::Circle => "circle",
+        }
+    }
 }
 
 pub enum CronType {
@@ -1010,7 +1058,7 @@ mod tests {
     }
 
     #[test]
-    fn cron_del() {
+    fn cron_del_test() {
         let mock = MockTcpConnection {
             when_written: "{\"id\":1,\"method\":\"cron_del\",\"params\":[0]}".to_string(),
             return_val: TEST_OK_VAL.to_string(),
@@ -1020,5 +1068,21 @@ mod tests {
         let mut conn = conn_with_method(Method::CronDel, mock);
 
         assert_ok_result(conn.cron_del(&CronType::PowerOff));
+    }
+
+    #[test]
+    fn set_adjust_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"set_adjust\",\"params\":[\"increase\", \"ct\"]}"
+                .to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::SetAdjust, mock);
+
+        assert_ok_result(
+            conn.set_adjust(&super::AdjustableProp::Ct, &super::AdjustAction::Increase),
+        );
     }
 }
