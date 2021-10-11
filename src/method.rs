@@ -34,6 +34,7 @@ pub enum Method {
     BgAdjustBright,
     BgAdjustCt,
     BgAdjustColor,
+    BgSetPower,
     SetMusic,
     SetName,
     DevToggle,
@@ -95,6 +96,7 @@ impl From<&Method> for &str {
             Method::BgAdjustCt => "bg_adjust_ct",
             Method::BgAdjustColor => "bg_adjust_color",
             Method::DevToggle => "dev_toggle",
+            Method::BgSetPower => "bg_set_power",
         }
     }
 }
