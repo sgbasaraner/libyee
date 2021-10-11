@@ -5,3 +5,4 @@ mod power;
 mod rgb;
 mod search;
 mod connection;
+mod method_calls;
