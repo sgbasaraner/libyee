@@ -418,6 +418,127 @@ impl<C: Read + Write, R: RngCore> BulbConnection<C, R> {
     pub fn set_name(&mut self, name: &str) -> Result<StringVecResponse, MethodCallError> {
         self.call_method(Method::SetName, vec![MethodArg::String(name.to_string())])
     }
+
+    pub fn bg_set_ct_abx(
+        &mut self,
+        ct_value: u16,
+        mode: TransitionMode,
+    ) -> Result<StringVecResponse, MethodCallError> {
+        if ct_value > CT_MAX || ct_value < CT_MIN {
+            return Err(MethodCallError::BadRequest);
+        }
+
+        let args = mode.to_method_args()?;
+
+        self.call_method(
+            Method::BgSetCtAbx,
+            vec![MethodArg::Int(ct_value.into())]
+                .into_iter()
+                .chain(args.into_iter())
+                .collect(),
+        )
+    }
+
+    pub fn bg_set_rgb(
+        &mut self,
+        rgb: &RGB,
+        mode: TransitionMode,
+    ) -> Result<StringVecResponse, MethodCallError> {
+        let args = mode.to_method_args()?;
+
+        self.call_method(
+            Method::BgSetRgb,
+            vec![MethodArg::Int(u32::from(rgb) as i32)]
+                .into_iter()
+                .chain(args.into_iter())
+                .collect(),
+        )
+    }
+
+    pub fn bg_set_hsv(
+        &mut self,
+        hsv: &HSV,
+        mode: TransitionMode,
+    ) -> Result<StringVecResponse, MethodCallError> {
+        if !hsv.validate() {
+            return Err(MethodCallError::BadRequest);
+        }
+
+        let args = mode.to_method_args()?;
+
+        self.call_method(
+            Method::BgSetHsv,
+            vec![
+                MethodArg::Int(hsv.hue as i32),
+                MethodArg::Int(hsv.saturation as i32),
+            ]
+            .into_iter()
+            .chain(args.into_iter())
+            .collect(),
+        )
+    }
+
+    pub fn bg_set_bright(
+        &mut self,
+        brightness: u8,
+        mode: TransitionMode,
+    ) -> Result<StringVecResponse, MethodCallError> {
+        if brightness > MAX_BRIGHTNESS {
+            return Err(MethodCallError::BadRequest);
+        }
+
+        let args = mode.to_method_args()?;
+        self.call_method(
+            Method::BgSetBright,
+            vec![MethodArg::Int(brightness as i32)]
+                .into_iter()
+                .chain(args.into_iter())
+                .collect(),
+        )
+    }
+
+    pub fn bg_set_power(
+        &mut self,
+        power: Power,
+        trans_mode: TransitionMode,
+        power_mode: Option<PowerMode>,
+    ) -> Result<StringVecResponse, MethodCallError> {
+        let args = trans_mode.to_method_args()?;
+
+        let mut args: Vec<MethodArg> = vec![MethodArg::String(power.into())]
+            .into_iter()
+            .chain(args.into_iter())
+            .collect();
+
+        if let Some(pm) = power_mode {
+            args.push(MethodArg::Int(pm as i32));
+        }
+
+        self.call_method(Method::BgSetPower, args)
+    }
+
+    pub fn bg_toggle(&mut self) -> Result<StringVecResponse, MethodCallError> {
+        self.call_method(Method::BgToggle, vec![])
+    }
+
+    pub fn bg_set_default(&mut self) -> Result<StringVecResponse, MethodCallError> {
+        self.call_method(Method::BgSetDefault, vec![])
+    }
+
+    pub fn bg_start_cf(&mut self, cf: &ColorFlow) -> Result<StringVecResponse, MethodCallError> {
+        cf.params()
+            .and_then(|p| self.call_method(Method::BgStartCf, p))
+    }
+
+    pub fn bg_stop_cf(&mut self) -> Result<StringVecResponse, MethodCallError> {
+        self.call_method(Method::BgStopCf, vec![])
+    }
+
+    pub fn bg_set_scene(&mut self, scene: &Scene) -> Result<StringVecResponse, MethodCallError> {
+        scene
+            .params()
+            .and_then(|p| self.call_method(Method::BgSetScene, p))
+    }
 }
 
 struct MockTcpConnection {
