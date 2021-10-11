@@ -539,6 +539,22 @@ impl<C: Read + Write, R: RngCore> BulbConnection<C, R> {
             .params()
             .and_then(|p| self.call_method(Method::BgSetScene, p))
     }
+
+    pub fn bg_set_adjust(
+        &mut self,
+        prop: &AdjustableProp,
+        action: &AdjustAction,
+    ) -> Result<StringVecResponse, MethodCallError> {
+        let action_str: &str = action.into();
+        let prop_str: &str = prop.into();
+        self.call_method(
+            Method::BgSetAdjust,
+            vec![
+                MethodArg::String(action_str.to_string()),
+                MethodArg::String(prop_str.to_string()),
+            ],
+        )
+    }
 }
 
 struct MockTcpConnection {
@@ -1061,6 +1077,298 @@ mod tests {
         let mut conn = conn_with_method(Method::SetName, mock);
 
         assert_ok_result(conn.set_name("my_bulb"));
+    }
+
+    #[test]
+    fn bg_set_adjust_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"bg_set_adjust\",\"params\":[\"increase\", \"ct\"]}"
+                .to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::BgSetAdjust, mock);
+
+        assert_ok_result(
+            conn.bg_set_adjust(&super::AdjustableProp::Ct, &super::AdjustAction::Increase),
+        );
+    }
+
+    #[test]
+    fn bg_set_ct_abx_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"bg_set_ct_abx\",\"params\":[3500, \"smooth\", 500]}"
+                .to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::BgSetCtAbx, mock);
+
+        let result = conn.bg_set_ct_abx(3500, TransitionMode::Smooth(Duration::from_millis(500)));
+        assert_ok_result(result);
+    }
+
+    #[test]
+    fn bg_set_rgb_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"bg_set_rgb\",\"params\":[255, \"smooth\", 500]}"
+                .to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::BgSetRgb, mock);
+
+        let result = conn.bg_set_rgb(
+            &RGB { r: 0, g: 0, b: 255 },
+            TransitionMode::Smooth(Duration::from_millis(500)),
+        );
+        assert_ok_result(result);
+    }
+
+    #[test]
+    fn bg_set_hsv_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"bg_set_hsv\",\"params\":[255, 45, \"smooth\", 500]}"
+                .to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::BgSetHsv, mock);
+
+        let result = conn.bg_set_hsv(
+            &HSV {
+                hue: 255,
+                saturation: 45,
+            },
+            TransitionMode::Smooth(Duration::from_millis(500)),
+        );
+        assert_ok_result(result);
+    }
+
+    #[test]
+    fn bg_set_bright_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"bg_set_bright\",\"params\":[50, \"smooth\", 500]}"
+                .to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::BgSetBright, mock);
+
+        let result = conn.bg_set_bright(50, TransitionMode::Smooth(Duration::from_millis(500)));
+        assert_ok_result(result);
+    }
+
+    #[test]
+    fn bg_set_power_test() {
+        let mock = MockTcpConnection {
+            when_written:
+                "{\"id\":1,\"method\":\"bg_set_power\",\"params\":[\"on\", \"smooth\", 500]}"
+                    .to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::BgSetPower, mock);
+
+        let result = conn.bg_set_power(
+            crate::power::Power::On,
+            TransitionMode::Smooth(Duration::from_millis(500)),
+            None,
+        );
+        assert_ok_result(result);
+    }
+
+    #[test]
+    fn bg_set_default_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"bg_set_default\",\"params\":[]}".to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::BgSetDefault, mock);
+
+        assert_ok_result(conn.bg_set_default());
+    }
+
+    #[test]
+    fn bg_start_cf_test() {
+        let mock = MockTcpConnection {
+            when_written:
+                "{\"id\":1,\"method\":\"bg_start_cf\",\"params\":[4, 2, \"1000,2,2700,100,500,1,255,10,5000,7,0,0,500,2,5000,1\"]}"
+                    .to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::BgStartCf, mock);
+
+        let ctf_mode_1 = CtFlowTupleMode {
+            ct: 2700,
+            brightness: 100,
+        };
+        let cf_mode = ColorFlowTupleMode {
+            color: RGB { r: 0, g: 0, b: 255 },
+            brightness: 10,
+        };
+        let ctf_mode_2 = CtFlowTupleMode {
+            ct: 5000,
+            brightness: 1,
+        };
+        assert_ok_result(conn.bg_start_cf(&ColorFlow {
+            count: 4,
+            action: super::CfAction::TurnOff,
+            sequence: vec![
+                FlowTuple {
+                    duration: Duration::from_millis(1000),
+                    mode: FlowTupleMode::Ct(ctf_mode_1),
+                },
+                FlowTuple {
+                    duration: Duration::from_millis(500),
+                    mode: FlowTupleMode::Color(cf_mode),
+                },
+                FlowTuple {
+                    duration: Duration::from_millis(5000),
+                    mode: FlowTupleMode::Sleep,
+                },
+                FlowTuple {
+                    duration: Duration::from_millis(500),
+                    mode: FlowTupleMode::Ct(ctf_mode_2),
+                },
+            ],
+        }));
+    }
+
+    #[test]
+    fn bg_stop_cf_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"bg_stop_cf\",\"params\":[]}".to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::BgStopCf, mock);
+
+        assert_ok_result(conn.bg_stop_cf());
+    }
+
+    #[test]
+    fn bg_set_scene_color_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"bg_set_scene\",\"params\":[\"color\", 65280, 70]}"
+                .to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::BgSetScene, mock);
+
+        assert_ok_result(conn.bg_set_scene(&Scene::Color(&RGB { r: 0, g: 255, b: 0 }, 70)));
+    }
+
+    #[test]
+    fn bg_set_scene_hsv_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"bg_set_scene\",\"params\":[\"hsv\", 300, 70, 100]}"
+                .to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::BgSetScene, mock);
+
+        assert_ok_result(conn.bg_set_scene(&Scene::HSV(
+            &HSV {
+                hue: 300,
+                saturation: 70,
+            },
+            100,
+        )));
+    }
+
+    #[test]
+    fn bg_set_scene_ct_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"bg_set_scene\",\"params\":[\"ct\", 5400, 100]}"
+                .to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::BgSetScene, mock);
+
+        assert_ok_result(conn.bg_set_scene(&Scene::Ct(5400, 100)));
+    }
+
+    #[test]
+    fn bg_set_scene_cf_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"bg_set_scene\",\"params\":[\"cf\", 0, 0, \"1000,2,2700,100,500,1,255,10,5000,7,0,0,500,2,5000,1\"]}"
+                .to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let ctf_mode_1 = CtFlowTupleMode {
+            ct: 2700,
+            brightness: 100,
+        };
+        let cf_mode = ColorFlowTupleMode {
+            color: RGB { r: 0, g: 0, b: 255 },
+            brightness: 10,
+        };
+        let ctf_mode_2 = CtFlowTupleMode {
+            ct: 5000,
+            brightness: 1,
+        };
+
+        let cf = ColorFlow {
+            count: 0,
+            action: super::CfAction::Recover,
+            sequence: vec![
+                FlowTuple {
+                    duration: Duration::from_millis(1000),
+                    mode: FlowTupleMode::Ct(ctf_mode_1),
+                },
+                FlowTuple {
+                    duration: Duration::from_millis(500),
+                    mode: FlowTupleMode::Color(cf_mode),
+                },
+                FlowTuple {
+                    duration: Duration::from_millis(5000),
+                    mode: FlowTupleMode::Sleep,
+                },
+                FlowTuple {
+                    duration: Duration::from_millis(500),
+                    mode: FlowTupleMode::Ct(ctf_mode_2),
+                },
+            ],
+        };
+
+        let mut conn = conn_with_method(Method::BgSetScene, mock);
+
+        assert_ok_result(conn.bg_set_scene(&Scene::Cf(&cf)));
+    }
+
+    #[test]
+    fn bg_set_scene_auto_delay_off_test() {
+        let mock = MockTcpConnection {
+            when_written:
+                "{\"id\":1,\"method\":\"bg_set_scene\",\"params\":[\"auto_delay_off\", 50, 5]}"
+                    .to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::BgSetScene, mock);
+
+        assert_ok_result(conn.bg_set_scene(&Scene::AutoDelayOff(50, 5)));
     }
 }
 
