@@ -1,50 +1,60 @@
+use enum_iterator::IntoEnumIterator;
 use std::convert::TryFrom;
 
-#[derive(Debug, Hash, PartialEq, Eq)]
+#[derive(Debug, Hash, PartialEq, Eq, IntoEnumIterator)]
 pub enum Method {
     GetProp,
-    SetDefault,
     SetPower,
-    Toggle,
-    SetBright,
-    StartCf,
-    StopCf,
-    SetScene,
     CronAdd,
     CronGet,
     CronDel,
-    SetCtAbx,
     SetRgb,
     SetHsv,
+    SetCtAbx,
+    StartCf,
+    StopCf,
+    SetScene,
+    SetDefault,
+    SetBright,
     SetAdjust,
+    Toggle,
+    AdjustBright,
+    AdjustCt,
+    AdjustColor,
+    BgSetRgb,
+    BgSetHsv,
+    BgSetCtAbx,
+    BgStartCf,
+    BgStopCf,
+    BgSetScene,
+    BgSetDefault,
+    BgSetBright,
+    BgSetAdjust,
+    BgToggle,
+    BgAdjustBright,
+    BgAdjustCt,
+    BgAdjustColor,
     SetMusic,
     SetName,
+    DevToggle,
 }
 
 impl TryFrom<&str> for Method {
     type Error = &'static str;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        match value {
-            "get_prop" => Ok(Method::GetProp),
-            "set_default" => Ok(Method::SetDefault),
-            "set_power" => Ok(Method::SetPower),
-            "toggle" => Ok(Method::Toggle),
-            "set_bright" => Ok(Method::SetBright),
-            "start_cf" => Ok(Method::StartCf),
-            "stop_cf" => Ok(Method::StopCf),
-            "set_scene" => Ok(Method::SetScene),
-            "cron_add" => Ok(Method::CronAdd),
-            "cron_get" => Ok(Method::CronGet),
-            "cron_del" => Ok(Method::CronDel),
-            "set_ct_abx" => Ok(Method::SetCtAbx),
-            "set_rgb" => Ok(Method::SetRgb),
-            "set_hsv" => Ok(Method::SetHsv),
-            "set_adjust" => Ok(Method::SetAdjust),
-            "set_music" => Ok(Method::SetMusic),
-            "set_name" => Ok(Method::SetName),
-            _ => Err("Doesn't match known methods."),
-        }
+        let err: &'static str = "Doesn't match known methods.";
+        Method::into_enum_iter()
+            .find_map(|m| {
+                let method_str: &str = (&m).into();
+
+                if method_str == value {
+                    Some(m)
+                } else {
+                    None
+                }
+            })
+            .ok_or(err)
     }
 }
 
@@ -67,7 +77,24 @@ impl From<&Method> for &str {
             Method::SetHsv => "set_hsv",
             Method::SetAdjust => "set_adjust",
             Method::SetMusic => "set_music",
-            Method::SetName => "set_name"
+            Method::SetName => "set_name",
+            Method::AdjustBright => "adjust_bright",
+            Method::AdjustCt => "adjust_ct",
+            Method::AdjustColor => "adjust_color",
+            Method::BgSetRgb => "bg_set_rgb",
+            Method::BgSetHsv => "bg_set_hsv",
+            Method::BgSetCtAbx => "bg_set_ct_abx",
+            Method::BgStartCf => "bg_start_cf",
+            Method::BgStopCf => "bg_stop_cf",
+            Method::BgSetScene => "bg_set_scene",
+            Method::BgSetDefault => "bg_set_default",
+            Method::BgSetBright => "bg_set_bright",
+            Method::BgSetAdjust => "bg_set_adjust",
+            Method::BgToggle => "bg_toggle",
+            Method::BgAdjustBright => "bg_adjust_bright",
+            Method::BgAdjustCt => "bg_adjust_ct",
+            Method::BgAdjustColor => "bg_adjust_color",
+            Method::DevToggle => "dev_toggle",
         }
     }
 }
