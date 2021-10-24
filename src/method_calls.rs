@@ -1082,8 +1082,9 @@ mod tests {
     #[test]
     fn bg_set_adjust_test() {
         let mock = MockTcpConnection {
-            when_written: "{\"id\":1,\"method\":\"bg_set_adjust\",\"params\":[\"increase\", \"ct\"]}"
-                .to_string(),
+            when_written:
+                "{\"id\":1,\"method\":\"bg_set_adjust\",\"params\":[\"increase\", \"ct\"]}"
+                    .to_string(),
             return_val: TEST_OK_VAL.to_string(),
             written_val: None,
         };
@@ -1098,8 +1099,9 @@ mod tests {
     #[test]
     fn bg_set_ct_abx_test() {
         let mock = MockTcpConnection {
-            when_written: "{\"id\":1,\"method\":\"bg_set_ct_abx\",\"params\":[3500, \"smooth\", 500]}"
-                .to_string(),
+            when_written:
+                "{\"id\":1,\"method\":\"bg_set_ct_abx\",\"params\":[3500, \"smooth\", 500]}"
+                    .to_string(),
             return_val: TEST_OK_VAL.to_string(),
             written_val: None,
         };
@@ -1131,8 +1133,9 @@ mod tests {
     #[test]
     fn bg_set_hsv_test() {
         let mock = MockTcpConnection {
-            when_written: "{\"id\":1,\"method\":\"bg_set_hsv\",\"params\":[255, 45, \"smooth\", 500]}"
-                .to_string(),
+            when_written:
+                "{\"id\":1,\"method\":\"bg_set_hsv\",\"params\":[255, 45, \"smooth\", 500]}"
+                    .to_string(),
             return_val: TEST_OK_VAL.to_string(),
             written_val: None,
         };
@@ -1152,8 +1155,9 @@ mod tests {
     #[test]
     fn bg_set_bright_test() {
         let mock = MockTcpConnection {
-            when_written: "{\"id\":1,\"method\":\"bg_set_bright\",\"params\":[50, \"smooth\", 500]}"
-                .to_string(),
+            when_written:
+                "{\"id\":1,\"method\":\"bg_set_bright\",\"params\":[50, \"smooth\", 500]}"
+                    .to_string(),
             return_val: TEST_OK_VAL.to_string(),
             written_val: None,
         };
@@ -1261,8 +1265,9 @@ mod tests {
     #[test]
     fn bg_set_scene_color_test() {
         let mock = MockTcpConnection {
-            when_written: "{\"id\":1,\"method\":\"bg_set_scene\",\"params\":[\"color\", 65280, 70]}"
-                .to_string(),
+            when_written:
+                "{\"id\":1,\"method\":\"bg_set_scene\",\"params\":[\"color\", 65280, 70]}"
+                    .to_string(),
             return_val: TEST_OK_VAL.to_string(),
             written_val: None,
         };
@@ -1275,8 +1280,9 @@ mod tests {
     #[test]
     fn bg_set_scene_hsv_test() {
         let mock = MockTcpConnection {
-            when_written: "{\"id\":1,\"method\":\"bg_set_scene\",\"params\":[\"hsv\", 300, 70, 100]}"
-                .to_string(),
+            when_written:
+                "{\"id\":1,\"method\":\"bg_set_scene\",\"params\":[\"hsv\", 300, 70, 100]}"
+                    .to_string(),
             return_val: TEST_OK_VAL.to_string(),
             written_val: None,
         };
@@ -1369,6 +1375,32 @@ mod tests {
         let mut conn = conn_with_method(Method::BgSetScene, mock);
 
         assert_ok_result(conn.bg_set_scene(&Scene::AutoDelayOff(50, 5)));
+    }
+
+    #[test]
+    fn bg_toggle_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"bg_toggle\",\"params\":[]}".to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::BgToggle, mock);
+
+        assert_ok_result(conn.bg_toggle());
+    }
+
+    #[test]
+    fn toggle_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"toggle\",\"params\":[]}".to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::Toggle, mock);
+
+        assert_ok_result(conn.toggle());
     }
 }
 
