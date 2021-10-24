@@ -1,16 +1,17 @@
 use std::{
     convert::TryInto,
     io::{self, Read, Write},
+    time::Duration,
 };
 
 use rand::{Rng, RngCore};
 
 use crate::{
     connection::{
-        AdjustAction, AdjustableProp, BulbConnection, CfAction, ColorFlow, Cron, CronResponse,
-        CronType, ErrorResponse, FlowTuple, FlowTupleMode, MethodCallError, MethodCallResponse,
-        MusicMode, PowerMode, Scene, StringVecResponse, TransitionMode, CT_MAX, CT_MIN,
-        MAX_BRIGHTNESS, MINIMUM_CF_DURATION, MINIMUM_TRANSITION_DURATION,
+        AdjustAction, AdjustableProp, Brightness, BulbConnection, CfAction, ColorFlow, Cron,
+        CronResponse, CronType, Ct, ErrorResponse, FlowTuple, FlowTupleMode, MethodCallError,
+        MethodCallResponse, MusicMode, PowerMode, Scene, StringVecResponse, TransitionMode, CT_MAX,
+        CT_MIN, MAX_BRIGHTNESS, MINIMUM_CF_DURATION, MINIMUM_TRANSITION_DURATION,
         MIN_AUTO_DELAY_OFF_MINUTES,
     },
     lightmode::HSV,
@@ -558,6 +559,75 @@ impl<C: Read + Write, R: RngCore> BulbConnection<C, R> {
 
     pub fn dev_toggle(&mut self) -> Result<StringVecResponse, MethodCallError> {
         self.call_method(Method::DevToggle, vec![])
+    }
+
+    pub fn adjust_bright(
+        &mut self,
+        percentage: i8,
+        duration: &Duration,
+    ) -> Result<StringVecResponse, MethodCallError> {
+        self.adjust(percentage, duration, Method::AdjustBright)
+    }
+
+    pub fn adjust_ct(
+        &mut self,
+        percentage: i8,
+        duration: &Duration,
+    ) -> Result<StringVecResponse, MethodCallError> {
+        self.adjust(percentage, duration, Method::AdjustCt)
+    }
+
+    pub fn adjust_color(
+        &mut self,
+        percentage: i8,
+        duration: &Duration,
+    ) -> Result<StringVecResponse, MethodCallError> {
+        self.adjust(percentage, duration, Method::AdjustColor)
+    }
+
+    pub fn bg_adjust_bright(
+        &mut self,
+        percentage: i8,
+        duration: &Duration,
+    ) -> Result<StringVecResponse, MethodCallError> {
+        self.adjust(percentage, duration, Method::BgAdjustBright)
+    }
+
+    pub fn bg_adjust_ct(
+        &mut self,
+        percentage: i8,
+        duration: &Duration,
+    ) -> Result<StringVecResponse, MethodCallError> {
+        self.adjust(percentage, duration, Method::BgAdjustCt)
+    }
+
+    pub fn bg_adjust_color(
+        &mut self,
+        percentage: i8,
+        duration: &Duration,
+    ) -> Result<StringVecResponse, MethodCallError> {
+        self.adjust(percentage, duration, Method::BgAdjustColor)
+    }
+
+    fn adjust(
+        &mut self,
+        percentage: i8,
+        duration: &Duration,
+        method: Method,
+    ) -> Result<StringVecResponse, MethodCallError> {
+        if percentage < -100 || percentage > 100 {
+            return Err(MethodCallError::BadRequest);
+        }
+        if duration < &MINIMUM_TRANSITION_DURATION {
+            return Err(MethodCallError::BadRequest);
+        }
+        self.call_method(
+            method,
+            vec![
+                MethodArg::Int(percentage as i32),
+                MethodArg::Int(duration.as_millis() as i32),
+            ],
+        )
     }
 }
 
@@ -1418,6 +1488,87 @@ mod tests {
         let mut conn = conn_with_method(Method::DevToggle, mock);
 
         assert_ok_result(conn.dev_toggle());
+    }
+
+    #[test]
+    fn adjust_bright_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"adjust_bright\",\"params\":[20, 500]}"
+                .to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::AdjustBright, mock);
+
+        assert_ok_result(conn.adjust_bright(20, &Duration::from_millis(500)));
+    }
+
+    #[test]
+    fn adjust_ct_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"adjust_ct\",\"params\":[20, 500]}".to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::AdjustCt, mock);
+
+        assert_ok_result(conn.adjust_ct(20, &Duration::from_millis(500)));
+    }
+
+    #[test]
+    fn adjust_color_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"adjust_color\",\"params\":[20, 500]}".to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::AdjustColor, mock);
+
+        assert_ok_result(conn.adjust_color(20, &Duration::from_millis(500)));
+    }
+
+    #[test]
+    fn bg_adjust_bright_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"bg_adjust_bright\",\"params\":[20, 500]}"
+                .to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::BgAdjustBright, mock);
+
+        assert_ok_result(conn.bg_adjust_bright(20, &Duration::from_millis(500)));
+    }
+
+    #[test]
+    fn bg_adjust_ct_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"bg_adjust_ct\",\"params\":[20, 500]}".to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::BgAdjustCt, mock);
+
+        assert_ok_result(conn.bg_adjust_ct(20, &Duration::from_millis(500)));
+    }
+
+    #[test]
+    fn bg_adjust_color_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"bg_adjust_color\",\"params\":[20, 500]}"
+                .to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::BgAdjustColor, mock);
+
+        assert_ok_result(conn.bg_adjust_color(20, &Duration::from_millis(500)));
     }
 }
 
