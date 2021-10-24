@@ -555,6 +555,10 @@ impl<C: Read + Write, R: RngCore> BulbConnection<C, R> {
             ],
         )
     }
+
+    pub fn dev_toggle(&mut self) -> Result<StringVecResponse, MethodCallError> {
+        self.call_method(Method::DevToggle, vec![])
+    }
 }
 
 struct MockTcpConnection {
@@ -1401,6 +1405,19 @@ mod tests {
         let mut conn = conn_with_method(Method::Toggle, mock);
 
         assert_ok_result(conn.toggle());
+    }
+
+    #[test]
+    fn dev_toggle_test() {
+        let mock = MockTcpConnection {
+            when_written: "{\"id\":1,\"method\":\"dev_toggle\",\"params\":[]}".to_string(),
+            return_val: TEST_OK_VAL.to_string(),
+            written_val: None,
+        };
+
+        let mut conn = conn_with_method(Method::DevToggle, mock);
+
+        assert_ok_result(conn.dev_toggle());
     }
 }
 
