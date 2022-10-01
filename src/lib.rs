@@ -1,8 +1,8 @@
-mod bulb;
-mod lightmode;
-mod method;
-mod power;
-mod rgb;
-mod search;
-mod connection;
-mod method_calls;
+pub mod bulb;
+pub mod lightmode;
+pub mod method;
+pub mod power;
+pub mod rgb;
+pub mod search;
+pub mod connection;
+pub mod method_calls;
